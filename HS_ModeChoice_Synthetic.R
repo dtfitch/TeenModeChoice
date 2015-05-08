@@ -51,6 +51,28 @@ for (i in 1:length(ID)){
 # Make sure scores by item look correct
 table(Score,Item)
 
+
+# Latent Variable Model (two latent variables)--------------------
+
+m.LV_comp<- map2stan(
+          alist(
+            Score ~ dordlogit(phi, cutpoints),
+            phi <- Load[Item]*Factor[FID],
+            Load[Item] ~ dnorm(0,10),
+            Factor[FID] ~ dnorm(0,1),
+            cutpoints ~ dnorm(0,10)
+            ),
+          data=list(Score=Score,Item=Item,FID=FID),
+          start=list(cutpoints=c(-.5,-.25,0,.25)),
+          iter=2, warmup=1
+        )
+m.LV <- resample(m.LV_comp,iter=1000,warmup=500)
+
+#SCRAP
+c(cutpoints,Load)[Item] ~ dmvnorm2(c(a,b),sigma_item,Rho),
+c(a,b) ~ dnorm(0,10),
+
+
 # Create Choice data -------------------------------------------
 # Person ID
 ID2 <- rep(1:n)
@@ -82,28 +104,6 @@ for ( i in 1:n ){
   Mode[i] <- sample( 1:5 , size=1 , prob=p[i,] )
 } 
 
-
-# Attempt to define models using rethinking
-
-# Latent Variable Model (two latent variables)--------------------
-
-m.LV_comp<- map2stan(
-          alist(
-            Score ~ dordlogit(phi, cutpoints),
-            phi <- Load[Item]*Factor[FID],
-            Load[Item] ~ dnorm(0,10),
-            Factor[FID] ~ dnorm(0,1),
-            cutpoints ~ dnorm(0,10)
-            ),
-          data=list(Score=Score,Item=Item,FID=FID),
-          start=list(cutpoints=c(-.5,-.25,0,.25)),
-          iter=2, warmup=1
-        )
-m.LV <- resample(m.LV_comp,iter=1000,warmup=500)
-
-#SCRAP
-c(cutpoints,Load)[Item] ~ dmvnorm2(c(a,b),sigma_item,Rho),
-c(a,b) ~ dnorm(0,10),
 
 # Mode Choice Model (NO latent variables)--------------------
 
