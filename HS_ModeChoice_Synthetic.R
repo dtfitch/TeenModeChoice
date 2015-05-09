@@ -26,17 +26,14 @@ library(rethinking)
 
 # Create synthetic data for model testing 
 # Create Attitudes data (ID, Item, Factor, Male, Score)-----------
-n <- 3000
+n <- 100
 # Person ID
 ID <- rep(1:n, each=6)
 # Item ID
 Item <- rep(1:6, times=n)
-#Factor ID
-FID <- rep(1:2, times=n, each=3)
-#break factor into two dummy variables
-Factor1 <- rep(c(1,0), times=n, each=3)
-Factor2 <- rep(c(0,1), times=n, each=3)
-# Loadings
+#Factor (factor 1 = 1, factor 2 = 2)
+Factor <- rep(1:2, times=n, each=3)
+# Loadings (item 1:6 loadings)
 Load = rep(c(.5,2,4,4,2,.5),times=n)
 # Potential covariate for later
 Male <- rep(rbinom(n,1,.5), each=6)
@@ -45,7 +42,8 @@ Male <- rep(rbinom(n,1,.5), each=6)
 Score <- rep(NA,length(ID))
 # generate phi and scores
 for (i in 1:length(ID)){
-  phi = Load[i]*Factor1[i] + Load[i]*Factor2[i]
+  phi = Load[i]*Factor[i]
+  print(phi)
   Score[i] = rordlogit(1,phi,1:4)
 }
 # Make sure scores by item look correct
@@ -57,20 +55,16 @@ table(Score,Item)
 m.LV_comp<- map2stan(
           alist(
             Score ~ dordlogit(phi, cutpoints),
-            phi <- Load[Item]*Factor[FID],
-            Load[Item] ~ dnorm(0,10),
-            Factor[FID] ~ dnorm(0,1),
+            phi <- lambda[Item]*ksi[Factor] + bmale*Male, # is this how to add a predictor variable?
+            lambda[Item] ~ dnorm(0,10),
+            ksi[Factor] ~ dnorm(0,1), # How do I add a covariance between factors?
             cutpoints ~ dnorm(0,10)
             ),
-          data=list(Score=Score,Item=Item,FID=FID),
+          data=list(Score=Score,Item=Item,Factor=Factor, Male=Male),
           start=list(cutpoints=c(-.5,-.25,0,.25)),
           iter=2, warmup=1
         )
-m.LV <- resample(m.LV_comp,iter=1000,warmup=500)
-
-#SCRAP
-c(cutpoints,Load)[Item] ~ dmvnorm2(c(a,b),sigma_item,Rho),
-c(a,b) ~ dnorm(0,10),
+m.LV <- resample(m.LV_comp,iter=1000,warmup=300)
 
 
 # Create Choice data -------------------------------------------
