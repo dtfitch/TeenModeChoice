@@ -164,7 +164,7 @@ m.mnl <- resample(m.mnl_comp,iter=2000,warmup=500)
 # added varying intercepts by school
 m.mnl2_comp <- map2stan(
                 alist(
-                  Mode ~ dcategorical(softmax(drive,bike,walk,bus,other)),
+                  Mode ~ dcategorical(softmax(0,bike,walk,bus,other)),
                   bike <- a_b + a_bj[School]+ b_bdist*Dist_B + b_bPE*Parent_Ed + b_bBE*Bike_Env,
                   walk <- a_w + a_wj[School]+ b_wdist*Dist_W + b_wPE*Parent_Ed,
                   bus <- a_bu + a_buj[School]+ b_budist*Dist_Bu + b_buPE*Parent_Ed,
