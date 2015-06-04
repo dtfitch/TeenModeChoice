@@ -54,7 +54,11 @@ for (i in 1:length(ID)){
 }
 # Make sure scores by item look correct
 table(Score,Item, Factor)
-dens(Score)
+
+# Plot Factor 1 Item loadings
+barplot(table(Score,Item,Factor)[,,1])
+# Plot Factor 2 Item loadings
+barplot(table(Score,Item,Factor)[,,2])
 
 # discrete proportion of each response value 
 pr_k <- table( Score ) / length(Score)
@@ -78,10 +82,11 @@ m.int_comp <- map2stan(
             )
 m.int <- resample(m.int_comp,iter=1000,warmup=300)
 precis(m.int,depth=2)
-# Intercept model returns correct cum_pr_k
+
+# Intercept model returns correct cum_pr_k as mean cutpoints (looking good!)
 
 # 2 Factor Model-------------------------------
-m.LV_comp <- map2stan(
+m.LV2c <- map2stan(
               alist(
                 Score ~ dordlogit(phi, cutpoints),
                 phi <- Loading[Item]*Attitude1[ID]*Factor1Dum + 
@@ -89,26 +94,52 @@ m.LV_comp <- map2stan(
                 Loading[Item] ~ dnorm(0,2),
                 Attitude1[ID] ~ dnorm(0,sigma1),
                 Attitude2[ID] ~ dnorm(0,sigma2),
-                sigma1 ~ dcauchy(0,1),
-                sigma2 ~ dcauchy(0,1),
-                cutpoints ~ dnorm(0,10)
+                sigma1 ~ dcauchy(0,.5),
+                sigma2 ~ dcauchy(0,.5),
+                cutpoints ~ dnorm(0,5)
                 ),
-              data=list(Score=Score,Item=Item,Factor=Factor,ID=ID,Factor1Dum=Factor1Dum,
+              data=list(Score=Score,Item=Item,ID=ID,Factor1Dum=Factor1Dum,
                         Factor2Dum=Factor2Dum),
               start=list(cutpoints=c(-1,-.2,.4,1)),
               iter=2, warmup=1
             )
-m.LV <- resample(m.LV_comp,iter=5000,warmup=500)
-plot(precis(m.LV,depth=2))
-atts <- coef(m.LV)[7:106]
-dens(logistic(atts))
-post <- extract.samples(m.LV)
+m.LV2 <- resample(m.LV2c,iter=2000,warmup=500)
+plot(precis(m.LV2,depth=2))
+
+# Get samples and look at parameter posterior densities
+post <- extract.samples(m.LV2)
 dens(post$Loading[,1],xlim=c(-6,6))
 dens(post$Loading[,2],add=TRUE)
 dens(post$Loading[,3],add=TRUE)
 dens(post$Loading[,4],add=TRUE,col="blue")
 dens(post$Loading[,5],add=TRUE,col="blue")
 dens(post$Loading[,6],add=TRUE,col="blue")
+
+# Use model to predict outcome
+p.cutpoints <- unname(m.LV2@coef[1:4])
+p.load1 <- rep(c(unname(m.LV2@coef[5:7]),0,0,0),times=n)
+p.load2 <- rep(c(0,0,0,unname(m.LV2@coef[8:10])),times=n)
+p.Att <- rep(c(rbind(unname(m.LV2@coef[11:110]),unname(m.LV2@coef[111:210]))),each=3)
+
+# Create Scores
+p.score <- rep(NA,length(ID))
+for (i in 1:length(ID)){
+  phi = p.load1[i]*p.Att[i] + p.load2[i]*p.Att[i]
+  p.score[i] = rordlogit(1,phi,p.cutpoints) 
+}
+# Make sure scores by item look correct (Factor 1 looks good, but not Factor 2)
+table(p.score,Item, Factor)
+
+# Plot Factor 1 Item loadings
+par(mfrow=c(1,2))
+barplot(table(Score,Item,Factor)[,,1],main="Factor 1 Synthetic Data")
+barplot(table(p.score,Item,Factor)[,,1],main="Factor 1 Predicted Data")
+# Plot Factor 2 Item loadings
+barplot(table(Score,Item,Factor)[,,2],main="Factor 2 Synthetic Data")
+barplot(table(p.score,Item,Factor)[,,2],main="Factor 2 Predicted Data")
+
+# Not working!
+
 
 
 # Create Choice data -------------------------------------------
@@ -160,6 +191,7 @@ m.mnl_comp <- map2stan(
           )
 m.mnl <- resample(m.mnl_comp,iter=2000,warmup=500)
 
+pred <- sim(m.mnl)
 # More complex mnl model ---------------------------------------------
 # added varying intercepts by school
 m.mnl2_comp <- map2stan(
